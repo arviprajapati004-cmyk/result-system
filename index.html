@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Master - Final Result</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Anek+Gujarati:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        body { font-family: 'Anek Gujarati', sans-serif; background: #f1f5f9; }
+        .glass { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0; }
+        .input-box { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; background: #fff; }
+        .page { display: none; } .page.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Common Table */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .data-table th { background: #e0e7ff; padding: 10px; text-align: center; border-bottom: 2px solid #6366f1; color: #1e1b4b; }
+        .data-table td { padding: 6px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+        .mark-input { width: 50px; padding: 5px; text-align: center; border: 1px solid #94a3b8; border-radius: 4px; font-weight: bold; }
+        .mark-input:disabled { background-color: #fee2e2; color: #dc2626; border-color: #ef4444; }
+        .sub-chk { width: 16px; height: 16px; accent-color: #16a34a; cursor: pointer; }
+
+        /* --- 🖨️ RESULT CARD DESIGN (A4 PDF STYLE) --- */
+        #resultPreview {
+            width: 210mm; min-height: 297mm; background: white; margin: 0 auto; padding: 15mm;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1); display: none; color: #000; position: relative;
+        }
+        .header-top { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        .school-name { text-align: center; font-size: 24px; font-weight: 800; color: #000; margin-bottom: 2px; }
+        .school-addr { text-align: center; font-size: 12px; margin-bottom: 10px; }
+        .year-line { text-align: center; font-weight: bold; font-size: 14px; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 5px 0; margin-bottom: 15px; }
+        .report-title { text-align: center; font-size: 18px; font-weight: 800; text-decoration: underline; margin-bottom: 20px; }
+
+        .info-grid { width: 100%; margin-bottom: 20px; border: 1px solid #000; }
+        .info-grid td { padding: 6px 10px; border: 1px solid #000; font-size: 13px; text-align: left; }
+        .label { font-weight: bold; width: 130px; background: #f3f4f6; }
+        .val { font-weight: 600; color: #1f2937; }
+
+        .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border: 2px solid #000; }
+        .marks-table th { border: 1px solid #000; padding: 8px; background: #e5e7eb; font-weight: 800; font-size: 13px; }
+        .marks-table td { border: 1px solid #000; padding: 8px; text-align: center; font-weight: 600; font-size: 14px; }
+        .sub-col { text-align: left !important; padding-left: 15px !important; }
+
+        .summary-box { display: flex; justify-content: space-between; border: 2px solid #000; padding: 10px; margin-bottom: 40px; background: #f9fafb; }
+        .s-item { text-align: center; }
+        .s-label { font-size: 12px; font-weight: bold; color: #4b5563; }
+        .s-val { font-size: 16px; font-weight: 800; color: #000; }
+
+        .footer-sign { display: flex; justify-content: space-between; margin-top: 50px; font-weight: bold; font-size: 14px; }
+        .sign-box { text-align: center; width: 200px; border-top: 1px solid #000; padding-top: 5px; }
+
+        /* Print Hide */
+        @media print {
+            body * { visibility: hidden; }
+            #resultPreview, #resultPreview * { visibility: visible; }
+            #resultPreview { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 10mm; box-shadow: none; }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="flex min-h-screen">
+        <aside class="w-64 bg-slate-900 text-white hidden md:flex flex-col p-4 fixed h-full z-20 overflow-y-auto no-print">
+            <div class="text-2xl font-bold mb-8 flex items-center gap-2"><i class="fas fa-graduation-cap text-yellow-400"></i> Exam Master</div>
+            <nav class="space-y-2">
+                <button onclick="showPage('dashboard')" class="w-full text-left p-3 rounded hover:bg-white/10 flex gap-3 items-center"><i class="fas fa-home w-6 text-center"></i> ડેશબોર્ડ</button>
+                <button onclick="showPage('students')" class="w-full text-left p-3 rounded hover:bg-white/10 flex gap-3 items-center"><i class="fas fa-users w-6 text-center"></i> વિદ્યાર્થી લિસ્ટ</button>
+                <div class="h-px bg-white/20 my-2"></div>
+                <button onclick="showPage('marks')" class="w-full text-left p-3 rounded hover:bg-white/10 flex gap-3 items-center"><i class="fas fa-edit w-6 text-center"></i> વિષય માર્ક્સ (A)</button>
+                <button onclick="showPage('patrak_b')" class="w-full text-left p-3 rounded hover:bg-white/10 flex gap-3 items-center"><i class="fas fa-child w-6 text-center"></i> પત્રક-B (વ્યક્તિત્વ)</button>
+                <div class="h-px bg-white/20 my-2"></div>
+                <button onclick="showPage('result')" class="w-full text-left p-3 rounded hover:bg-white/10 flex gap-3 items-center text-green-300 font-bold"><i class="fas fa-print w-6 text-center"></i> રિઝલ્ટ (Print)</button>
+            </nav>
+        </aside>
+
+        <div class="flex-1 md:ml-64 p-6 pb-24">
+            <div id="loader" class="hidden fixed inset-0 bg-white/90 z-50 flex flex-col items-center justify-center">
+                <i class="fas fa-circle-notch fa-spin text-5xl text-indigo-600 mb-4"></i>
+                <button onclick="toggleLoader(false)" class="text-red-500 underline text-sm">Force Close</button>
+            </div>
+
+            <div id="dashboard" class="page active">
+                <h2 class="text-3xl font-bold mb-6">ડેશબોર્ડ</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass p-6 border-l-4 border-blue-500">
+                        <div class="text-gray-500 font-bold text-xs uppercase">કુલ વિદ્યાર્થીઓ</div>
+                        <div class="text-4xl font-bold mt-2" id="countStudents">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="students" class="page"><div class="glass p-6"><div class="flex justify-between mb-4"><h2 class="text-2xl font-bold">વિદ્યાર્થી</h2><button onclick="openModal()" class="bg-indigo-600 text-white px-4 py-2 rounded">નવો</button></div><div class="overflow-x-auto border rounded"><table class="data-table w-full"><thead><tr><th>GR</th><th>Roll</th><th>Name</th><th>Class</th><th>Act</th></tr></thead><tbody id="studentTableBody"></tbody></table></div></div></div>
+            <div id="marks" class="page"><div class="glass p-6"><h2 class="text-2xl font-bold mb-4">પત્રક-A</h2><div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4"><select id="m_std" class="input-box"><option>6</option><option>7</option><option>8</option></select><select id="m_div" class="input-box"><option>A</option><option>B</option><option>C</option></select><select id="m_sem" class="input-box"><option value="Sem1">સત્ર 1</option><option value="Sem2">સત્ર 2</option></select><select id="m_type" class="input-box"><option value="Rachnatmak" data-max="40">રચનાત્મક (40)</option><option value="Exam" data-max="80">સત્રાંત (80)</option><option value="Swadhyay" data-max="20">સ્વ (20)</option></select><button onclick="loadMarksTable()" class="bg-blue-600 text-white rounded w-full">Go</button></div><div class="overflow-x-auto border rounded"><form onsubmit="saveMarks(event)"><table class="data-table w-full"><tbody id="marksTableBody"></tbody></table><button class="bg-green-600 text-white px-6 py-2 m-4 rounded hidden" id="saveBtnContainer">Save</button></form></div></div></div>
+            <div id="patrak_b" class="page"><div class="glass p-6"><h2 class="text-2xl font-bold mb-4">પત્રક-B</h2><div class="grid grid-cols-4 gap-4 mb-4"><select id="pb_std" class="input-box"><option>6</option><option>7</option><option>8</option></select><select id="pb_div" class="input-box"><option>A</option><option>B</option><option>C</option></select><select id="pb_sem" class="input-box"><option value="Sem1">સત્ર 1</option><option value="Sem2">સત્ર 2</option></select><button onclick="loadPatrakB()" class="bg-blue-600 text-white rounded w-full">Go</button></div><div class="overflow-x-auto border rounded"><form onsubmit="savePatrakB(event)"><table class="data-table"><thead id="pbHeader"></thead><tbody id="pbBody"></tbody></table><button class="bg-green-600 text-white px-6 py-2 m-4 rounded hidden" id="pbSaveBtn">Save</button></form></div></div></div>
+
+            <div id="result" class="page">
+                <div class="glass p-6 no-print mb-8">
+                    <h2 class="text-2xl font-bold text-indigo-900 mb-6">રિઝલ્ટ અને PDF</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                        <div><label class="text-xs font-bold text-gray-500">ધોરણ</label><select id="r_std" class="input-box" onchange="loadResultStudents()"><option>6</option><option>7</option><option>8</option></select></div>
+                        <div><label class="text-xs font-bold text-gray-500">વર્ગ</label><select id="r_div" class="input-box" onchange="loadResultStudents()"><option>A</option><option>B</option><option>C</option></select></div>
+                        <div><label class="text-xs font-bold text-gray-500">વિદ્યાર્થી</label><select id="r_student" class="input-box"><option>Loading...</option></select></div>
+                        <div><label class="text-xs font-bold text-gray-500">પરીક્ષા</label><select id="r_type" class="input-box"><option value="Sem1">સત્ર 1</option><option value="Sem2">સત્ર 2</option><option value="Annual">વાર્ષિક</option></select></div>
+                        
+                        <div class="md:col-span-1"><label class="text-xs font-bold text-gray-500">કુલ દિવસ</label><input type="number" id="manual_total_days" class="input-box" placeholder="120"></div>
+                        <div class="md:col-span-1"><label class="text-xs font-bold text-gray-500">હાજર દિવસ</label><input type="number" id="manual_present_days" class="input-box" placeholder="100"></div>
+                    </div>
+                    <button onclick="generateResult()" class="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold w-full mb-2">પરિણામ જુઓ</button>
+                    <button onclick="window.print()" class="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold w-full hidden" id="btnPrint"><i class="fas fa-print mr-2"></i> PDF પ્રિન્ટ કરો</button>
+                </div>
+
+                <div id="resultPreview">
+                    <div class="header-top">બનાસકાંઠા જિલ્લા પંચાયત સંચાલિત</div>
+                    <div class="school-name">ઇકબાલગઢ પગાર કેન્દ્ર શાળા પીએમશ્રી ગુજરાત</div>
+                    <div class="school-addr">તા.અમીરગઢ, જિ.બનાસકાંઠા</div>
+                    <div class="year-line">શાળાકીય સર્વગ્રાહી મૂલ્યાંકન વર્ષ: 2025-26</div>
+                    <div class="report-title" id="resTitle">પ્રગતિ પત્રક (સત્ર 1)</div>
+
+                    <table class="info-grid">
+                        <tr>
+                            <td class="label">વિધાર્થીનું નામ:</td><td class="val" id="rn_name" colspan="3"></td>
+                        </tr>
+                        <tr>
+                            <td class="label">ધોરણ / વર્ગ:</td><td class="val" id="rn_class"></td>
+                            <td class="label" style="width: 100px;">જ.૨. નંબર:</td><td class="val" id="rn_gr"></td>
+                        </tr>
+                        <tr>
+                            <td class="label">હાજરી પત્રક નં.:</td><td class="val" id="rn_roll"></td>
+                            <td class="label">જન્મ તારીખ:</td><td class="val" id="rn_dob">--</td>
+                        </tr>
+                        <tr>
+                            <td class="label">સ્ટુડન્ટ ડાયસ નં.:</td><td class="val" id="rn_dise" colspan="3">--</td>
+                        </tr>
+                        <tr>
+                            <td class="label">પિતાનું નામ:</td><td class="val" id="rn_father" colspan="3">--</td>
+                        </tr>
+                    </table>
+
+                    <table class="marks-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">ક્રમ</th>
+                                <th style="text-align: left; padding-left: 15px;">વિષયનું નામ</th>
+                                <th style="width: 80px;">કુલ ગુણ</th>
+                                <th style="width: 80px;">મેળવેલ ગુણ</th>
+                                <th style="width: 60px;">ગ્રેડ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resBody">
+                            </tbody>
+                        <tfoot id="resFooter" style="background: #f3f4f6;">
+                            </tfoot>
+                    </table>
+
+                    <div class="summary-box">
+                        <div class="s-item"><div class="s-label">ટકાવારી</div><div class="s-val" id="rs_perc">--%</div></div>
+                        <div class="s-item"><div class="s-label">પરિણામ</div><div class="s-val" id="rs_res">--</div></div>
+                        <div class="s-item"><div class="s-label">કુલ દિવસ</div><div class="s-val" id="rs_td">--</div></div>
+                        <div class="s-item"><div class="s-label">હાજર દિવસ</div><div class="s-val" id="rs_pd">--</div></div>
+                    </div>
+
+                    <div class="footer-sign">
+                        <div class="sign-box">વાલીની સહી</div>
+                        <div class="sign-box">વર્ગ શિક્ષકની સહી</div>
+                        <div class="sign-box">આચાર્યની સહી (સિક્કો)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="studentModal" class="fixed inset-0 bg-black/60 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8">
+            <h3 class="text-xl font-bold mb-4 border-b pb-2" id="modalTitle">વિદ્યાર્થી ઉમેરો</h3>
+            <form id="studentForm" onsubmit="saveStudent(event)">
+                <input type="hidden" id="docId">
+                <div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-xs">GR</label><input type="number" id="grNo" class="input-box" required></div><div><label class="text-xs">Roll</label><input type="number" id="rollNo" class="input-box" required></div></div>
+                <div class="mb-4"><label class="text-xs">Name</label><input type="text" id="fullName" class="input-box" required></div>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div><label class="text-xs">જન્મ તારીખ</label><input type="date" id="dob" class="input-box"></div>
+                    <div><label class="text-xs">DISE No</label><input type="text" id="diseNo" class="input-box"></div>
+                </div>
+                <div class="mb-4"><label class="text-xs">પિતાનું નામ</label><input type="text" id="fatherName" class="input-box"></div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-xs">Std</label><select id="std" class="input-box"><option>6</option><option>7</option><option>8</option></select></div><div><label class="text-xs">Div</label><select id="div" class="input-box"><option>A</option><option>B</option><option>C</option></select></div></div>
+                <div class="grid grid-cols-2 gap-4 mb-6"><div><label class="text-xs">Cat</label><select id="category" class="input-box"><option>OPEN</option><option>OBC</option><option>SC</option><option>ST</option></select></div><div><label class="text-xs">Gen</label><select id="gender" class="input-box"><option>કુમાર</option><option>કન્યા</option></select></div></div>
+                <div class="flex justify-end gap-3"><button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-100 rounded">રદ</button><button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded btn">સેવ</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc, orderBy, setDoc, getDoc } 
+            from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // ✅ CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSyDjusKZV-6ei_eOWRz2qmXNEK9qlmypAyw",
+            authDomain: "exam-system-eb30f.firebaseapp.com",
+            projectId: "exam-system-eb30f",
+            storageBucket: "exam-system-eb30f.firebasestorage.app",
+            messagingSenderId: "516597729558",
+            appId: "1:516597729558:web:050e0ab2675af99c12e837"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const getEl = (id) => document.getElementById(id);
+        const toggleLoader = (show) => getEl('loader').classList.toggle('hidden', !show);
+        const SUBJECTS = ["ગુજરાતી", "હિન્દી", "અંગ્રેજી", "ગણિત", "વિજ્ઞાન", "સા.વિજ્ઞાન", "સંસ્કૃત"]; // Gujarati Names
+        const SUB_KEYS = ["Gujarati", "Hindi", "English", "Math", "Science", "SS", "Sanskrit"]; // DB Keys
+
+        // --- RESULT GENERATION ---
+        window.loadResultStudents = async () => {
+            const std = getEl('r_std').value, div = getEl('r_div').value;
+            const q = query(collection(db, "students"), where("std", "==", std), where("div", "==", div));
+            const snap = await getDocs(q);
+            let html = '<option value="">Select Student</option>';
+            snap.forEach(d => { const s=d.data(); html += `<option value="${s.grNo}" data-name="${s.fullName}" data-roll="${s.rollNo}" data-dob="${s.dob||''}" data-dise="${s.diseNo||''}" data-father="${s.fatherName||''}">${s.rollNo} - ${s.fullName}</option>`; });
+            getEl('r_student').innerHTML = html;
+        };
+
+        const getGrade = (per) => { if(per>=80)return'A'; if(per>=65)return'B'; if(per>=50)return'C'; if(per>=35)return'D'; return 'E'; };
+
+        window.generateResult = async () => {
+            const grNo = getEl('r_student').value;
+            if(!grNo) return alert("Select Student");
+            
+            const type = getEl('r_type').value; 
+            const opt = getEl('r_student').options[getEl('r_student').selectedIndex];
+            const studentData = opt.dataset;
+            
+            toggleLoader(true);
+            try {
+                // Fetch Data
+                let marksData={}, pbData={}; const sems=type==='Annual'?['Sem1','Sem2']:[type];
+                for(const sem of sems){
+                    const mSnap=await getDoc(doc(db,"marks",`${grNo}_${sem}`)); if(mSnap.exists())marksData[sem]=mSnap.data();
+                    const pSnap=await getDoc(doc(db,"patrak_b",`${grNo}_${sem}`)); if(pSnap.exists())pbData[sem]=pSnap.data().total||0;
+                }
+
+                let html = '';
+                let totalObt = 0;
+                
+                // 1. Subjects (1-7)
+                SUBJECTS.forEach((subName, i) => {
+                    let key = SUB_KEYS[i];
+                    let subTotal = 0;
+                    
+                    sems.forEach(sem => {
+                        const m = marksData[sem] || {};
+                        const r = Number(m.Rachnatmak?.[key]) || 0;
+                        const e = (Number(m.Exam?.[key]) || 0) / 2; // Half
+                        const s = Number(m.Swadhyay?.[key]) || 0;
+                        subTotal += (r + e + s);
+                    });
+
+                    // 100 Marks per subject
+                    const grade = getGrade(subTotal); 
+                    totalObt += subTotal;
+
+                    html += `<tr>
+                        <td>${i+1}</td>
+                        <td class="sub-col">${subName}</td>
+                        <td>100</td>
+                        <td>${subTotal}</td>
+                        <td>${grade}</td>
+                    </tr>`;
+                });
+
+                // 2. Patrak B (8) - Total 400
+                let pbSum = 0;
+                sems.forEach(sem => pbSum += (pbData[sem] || 0));
+                // PDF Logic: 400 Total.
+                // Wait, if Annual: Sem1(400) + Sem2(400) = 800? 
+                // Let's stick to user logic: "Parinam ma ena addha".
+                // If Sem1: 400. If Annual: 800/2 = 400. So Max is always 400 in Result Table.
+                
+                let pbFinal = pbSum;
+                if(type === 'Annual') pbFinal = Math.round(pbSum / 2);
+
+                const pbGrade = getGrade((pbFinal/400)*100);
+                
+                html += `<tr>
+                    <td>8</td>
+                    <td class="sub-col">વ્યક્તિત્વ વિકાસ</td>
+                    <td>400</td>
+                    <td>${pbFinal}</td>
+                    <td>${pbGrade}</td>
+                </tr>`;
+
+                // 3. Grand Total (1100)
+                const grandTotal = totalObt + pbFinal;
+                const grandMax = 1100;
+                const grandPerc = (grandTotal / grandMax) * 100;
+                const grandGrade = getGrade(grandPerc);
+
+                // Render Info
+                getEl('rn_name').innerText = studentData.name;
+                getEl('rn_roll').innerText = studentData.roll;
+                getEl('rn_class').innerText = `${getEl('r_std').value} / ${getEl('r_div').value}`;
+                getEl('rn_gr').innerText = grNo;
+                getEl('rn_dob').innerText = studentData.dob || '--';
+                getEl('rn_dise').innerText = studentData.dise || '--';
+                getEl('rn_father').innerText = studentData.father || '--';
+                getEl('resTitle').innerText = type === 'Annual' ? 'પ્રગતિ પત્રક (વાર્ષિક)' : `પ્રગતિ પત્રક (${type === 'Sem1' ? 'સત્ર 1' : 'સત્ર 2'})`;
+
+                // Render Table
+                getEl('resBody').innerHTML = html;
+                getEl('resFooter').innerHTML = `<tr><td colspan="2" style="text-align: right; padding-right: 15px;">એકંદર ગુણ અને ગ્રેડ</td><td>1100</td><td>${grandTotal}</td><td>${grandGrade}</td></tr>`;
+
+                // Summary
+                getEl('rs_perc').innerText = grandPerc.toFixed(2) + '%';
+                getEl('rs_res').innerText = grandPerc >= 33 ? 'પાસ' : 'નાપાસ';
+                getEl('rs_td').innerText = getEl('manual_total_days').value || '--';
+                getEl('rs_pd').innerText = getEl('manual_present_days').value || '--';
+
+                getEl('resultPreview').style.display = 'block';
+                getEl('btnPrint').classList.remove('hidden');
+
+            } catch(e) { alert(e.message); } finally { toggleLoader(false); }
+        };
+
+        // --- COMMON LOGIC ---
+        window.saveStudent=async(e)=>{e.preventDefault();const id=getEl('docId').value;const d={grNo:Number(getEl('grNo').value),rollNo:Number(getEl('rollNo').value),fullName:getEl('fullName').value,std:getEl('std').value,div:getEl('div').value,category:getEl('category').value,gender:getEl('gender').value,status:'Active',dob:getEl('dob').value,diseNo:getEl('diseNo').value,fatherName:getEl('fatherName').value};toggleLoader(true);try{id?await updateDoc(doc(db,"students",id),d):await addDoc(collection(db,"students"),d);alert("Saved!");closeModal();loadStudents();}catch(e){alert(e.message);}toggleLoader(false);};
+        
+        // Compact functions for Marks/Students (Same as before)
+        window.toggleSubject=(c,id)=>{const i=getEl(id);if(c.checked){i.disabled=false;if(i.value==='AB')i.value='';}else{i.value='AB';i.disabled=true;}};
+        window.validateMark=(inp)=>{const s=getEl('m_type'),max=parseInt(s.options[s.selectedIndex].dataset.max);let v=Number(inp.value);if(inp.value===''||inp.value==='AB')return;if(isNaN(v)||v<0){alert("Invalid");inp.value='';}else if(v>max){alert("Limit "+max);inp.value='';}};
+        window.calcPbTotal=(gr,inp)=>{let v=Number(inp.value);if(isNaN(v)||v<0||v>10){inp.value='';v=0;}let t=0;document.querySelectorAll(`input[data-gr="${gr}"]`).forEach(i=>t+=(Number(i.value)||0));getEl(`total_${gr}`).innerText=t;};
+        
+        window.loadMarksTable=async()=>{const std=getEl('m_std').value,div=getEl('m_div').value,sem=getEl('m_sem').value,type=getEl('m_type').value,max=getEl('m_type').options[getEl('m_type').selectedIndex].dataset.max;toggleLoader(true);try{const q=query(collection(db,"students"),where("std","==",std),where("div","==",div));const snap=await getDocs(q);let students=[];snap.forEach(d=>students.push({id:d.id,...d.data()}));students.sort((a,b)=>a.rollNo-b.rollNo);let html='';for(const s of students){const markSnap=await getDoc(doc(db,"marks",`${s.grNo}_${sem}`));const m=markSnap.exists()?markSnap.data()[type]||{}:{};html+=`<tr class="border-b hover:bg-slate-50"><td class="text-center font-bold">${s.rollNo}</td><td class="text-left text-sm font-semibold">${s.fullName}</td>`;SUB_KEYS.forEach(sub=>{let v=m[sub]!==undefined?m[sub]:'',ab=v==='AB',chk=ab?'':'checked',dis=ab?'disabled':'',id=`i_${s.grNo}_${sub}`;html+=`<td><div class="flex items-center justify-center gap-1"><input type="checkbox" class="sub-chk" ${chk} onchange="toggleSubject(this,'${id}')"><input type="text" id="${id}" name="${s.grNo}_${sub}" value="${v}" class="mark-input" placeholder="${max}" ${dis} oninput="validateMark(this)"></div></td>`;});html+='</tr>';}getEl('marksTableBody').innerHTML=html||'<tr><td colspan="9">No Data</td></tr>';getEl('saveBtnContainer').classList.remove('hidden');}catch(e){alert(e.message);}toggleLoader(false);};
+        window.saveMarks=async(e)=>{e.preventDefault();const sem=getEl('m_sem').value,type=getEl('m_type').value;toggleLoader(true);try{const updates={};document.querySelectorAll('#marksTableBody .mark-input').forEach(i=>{const[g,s]=i.name.split('_');let v=i.value;if(i.disabled)v='AB';else if(v!=='')v=Number(v);if(!updates[g])updates[g]={};if(v!=='')updates[g][s]=v;});await Promise.all(Object.keys(updates).map(g=>setDoc(doc(db,"marks",`${g}_${sem}`),{[type]:updates[g]},{merge:true})));alert("Saved!");}catch(e){alert(e.message);}toggleLoader(false);};
+        window.loadPatrakB=async()=>{const std=getEl('pb_std').value,div=getEl('pb_div').value,sem=getEl('pb_sem').value;toggleLoader(true);try{let h=`<tr class="bg-green-100"><th class="sticky-col w-12 left-0 z-20">Roll</th><th class="sticky-col text-left w-48 left-12 z-20">Name</th>`;for(let i=1;i<=40;i++)h+=`<th class="w-10 text-xs text-gray-600">v${i}</th>`;h+=`<th class="w-16 bg-green-200">Total</th></tr>`;getEl('pbHeader').innerHTML=h;const q=query(collection(db,"students"),where("std","==",std),where("div","==",div));const snap=await getDocs(q);let students=[];snap.forEach(d=>students.push({id:d.id,...d.data()}));students.sort((a,b)=>a.rollNo-b.rollNo);if(students.length===0){getEl('pbBody').innerHTML='<tr><td colspan="43">No Data</td></tr>';getEl('pbSaveBtn').classList.add('hidden');}else{let bh='';for(const s of students){const docRef=doc(db,"patrak_b",`${s.grNo}_${sem}`);const docSnap=await getDoc(docRef);let marks=docSnap.exists()?docSnap.data().marks:Array(40).fill('');let total=marks.reduce((a,b)=>a+(Number(b)||0),0);bh+=`<tr class="border-b hover:bg-green-50"><td class="sticky-col left-0 bg-white font-bold">${s.rollNo}</td><td class="sticky-col left-12 bg-white text-left text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">${s.fullName}</td>`;for(let i=0;i<40;i++)bh+=`<td><input type="text" data-gr="${s.grNo}" class="mark-input pb-input w-8 p-1 text-xs" value="${marks[i]}" oninput="calcPbTotal('${s.grNo}',this)"></td>`;bh+=`<td id="total_${s.grNo}" class="font-bold text-green-700 bg-green-50">${total}</td></tr>`;}getEl('pbBody').innerHTML=bh;getEl('pbSaveBtn').classList.remove('hidden');}}catch(e){alert(e.message);}toggleLoader(false);};
+        window.savePatrakB=async(e)=>{e.preventDefault();const sem=getEl('pb_sem').value;toggleLoader(true);try{const u={};document.querySelectorAll('.pb-input').forEach(i=>{const g=i.dataset.gr;if(!u[g])u[g]=[];u[g].push(Number(i.value)||0);});await Promise.all(Object.keys(u).map(g=>{const m=u[g],t=m.reduce((a,b)=>a+b,0);return setDoc(doc(db,"patrak_b",`${g}_${sem}`),{marks:m,total:t});}));alert("PB Saved!");}catch(e){alert(e.message);}toggleLoader(false);};
+        window.loadStudents=async()=>{toggleLoader(true);const q=query(collection(db,"students"),orderBy("grNo"));const snap=await getDocs(q);let h='',c=0;snap.forEach(d=>{const s=d.data();c++;h+=`<tr class="border-b"><td>${s.grNo}</td><td>${s.rollNo}</td><td class="font-bold text-left">${s.fullName}</td><td>${s.std}-${s.div}</td><td><button onclick="editStudent('${d.id}','${s.grNo}','${s.rollNo}','${s.fullName}','${s.std}','${s.div}','${s.category}','${s.gender}')" class="text-blue-600 p-2"><i class="fas fa-edit"></i></button><button onclick="deleteStudent('${d.id}')" class="text-red-600 p-2"><i class="fas fa-trash"></i></button></td></tr>`;});getEl('studentTableBody').innerHTML=h;getEl('countStudents').innerText=c;toggleLoader(false);};
+        window.deleteStudent=async(id)=>{if(confirm("Delete?")){toggleLoader(true);await deleteDoc(doc(db,"students",id));loadStudents();toggleLoader(false);}};
+        window.openModal=()=>{getEl('studentForm').reset();getEl('docId').value='';getEl('modalTitle').innerText="Add";getEl('studentModal').classList.remove('hidden');};
+        window.closeModal=()=>{getEl('studentModal').classList.add('hidden');};
+        window.editStudent=(id,g,r,n,s,d,c,gen)=>{getEl('docId').value=id;getEl('grNo').value=g;getEl('rollNo').value=r;getEl('fullName').value=n;getEl('std').value=s;getEl('div').value=d;getEl('category').value=c;getEl('gender').value=gen;getEl('modalTitle').innerText="Edit";getEl('studentModal').classList.remove('hidden');try{getEl('dob').value=document.querySelector(`option[value="${g}"]`).dataset.dob;getEl('diseNo').value=document.querySelector(`option[value="${g}"]`).dataset.dise;getEl('fatherName').value=document.querySelector(`option[value="${g}"]`).dataset.father;}catch(e){}};
+        window.showPage=(id)=>{document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));getEl(id).classList.add('active');if(id==='result')loadResultStudents();};
+
+        loadStudents();
+    </script>
+</body>
+</html>
